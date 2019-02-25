@@ -39,8 +39,8 @@ parseUri.options = {
 requirejs.config({
     paths: {
         'jquery': 'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.1.1/jquery.min',
-        'lunr': 'https://cdnjs.cloudflare.com/ajax/libs/lunr.js/2.3.1/lunr.min',
-        'lodash': 'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.4/lodash.min',
+        'lunr': 'https://cdnjs.cloudflare.com/ajax/libs/lunr.js/2.3.5/lunr.min',
+        'lodash': 'https://cdnjs.cloudflare.com/ajax/libs/lodash.js/4.17.11/lodash.min',
     }
 });
 
@@ -161,7 +161,7 @@ require(["jquery", "lunr", "lodash"], function($, lunr, _) {
         'yet',
         'you',
         'your'
-        ])
+    ])
 
     // add . as a separator, because otherwise "title": "Documenter.Anchors.add!"
     // would not find anything if searching for "add!", only for the entire qualification
@@ -177,74 +177,77 @@ require(["jquery", "lunr", "lodash"], function($, lunr, _) {
     lunr.Pipeline.registerFunction(lunr.stopWordFilter, 'juliaStopWordFilter')
     lunr.Pipeline.registerFunction(lunr.trimmer, 'juliaTrimmer')
 
-    var index = lunr(function () {
-        this.ref('location')
-        this.field('title')
-        this.field('text')
-        documenterSearchIndex['docs'].forEach(function(e) {
-            this.add(e)
-        }, this)
-    })
-    var store = {}
+    $.getJSON("search_index.json", function (documenterSearchIndex) {
 
-    documenterSearchIndex['docs'].forEach(function(e) {
-        store[e.location] = {title: e.title, category: e.category}
-    })
+        var index = lunr(function () {
+            this.ref('location')
+            this.field('title')
+            this.field('text')
+            documenterSearchIndex.forEach(function (e) {
+                this.add(e)
+            }, this)
+        })
+        var store = {}
 
-    $(function(){
-        function update_search(querystring) {
-            tokens = lunr.tokenizer(querystring)
-            results = index.query(function (q) {
-                tokens.forEach(function (t) {
-                    q.term(t.toString(), {
-                        fields: ["title"],
-                        boost: 100,
-                        usePipeline: false,
-                        editDistance: 0,
-                        wildcard: lunr.Query.wildcard.NONE
-                    })
-                    q.term(t.toString(), {
-                        fields: ["title"],
-                        boost: 10,
-                        usePipeline: false,
-                        editDistance: 2,
-                        wildcard: lunr.Query.wildcard.NONE
-                    })
-                    q.term(t.toString(), {
-                        fields: ["text"],
-                        boost: 1,
-                        usePipeline: true,
-                        editDistance: 0,
-                        wildcard: lunr.Query.wildcard.NONE
+        documenterSearchIndex.forEach(function (e) {
+            store[e.location] = { title: e.title, category: e.category }
+        })
+
+        $(function () {
+            function update_search(querystring) {
+                tokens = lunr.tokenizer(querystring)
+                results = index.query(function (q) {
+                    tokens.forEach(function (t) {
+                        q.term(t.toString(), {
+                            fields: ["title"],
+                            boost: 100,
+                            usePipeline: false,
+                            editDistance: 0,
+                            wildcard: lunr.Query.wildcard.NONE
+                        })
+                        q.term(t.toString(), {
+                            fields: ["title"],
+                            boost: 10,
+                            usePipeline: false,
+                            editDistance: 2,
+                            wildcard: lunr.Query.wildcard.NONE
+                        })
+                        q.term(t.toString(), {
+                            fields: ["text"],
+                            boost: 1,
+                            usePipeline: true,
+                            editDistance: 0,
+                            wildcard: lunr.Query.wildcard.NONE
+                        })
                     })
                 })
-            })
-            $('#search-info').text("Number of results: " + results.length)
-            $('#search-results').empty()
-            results.forEach(function(result) {
-                data = store[result.ref]
-                link = $('<a>')
-                link.text(data.title)
-                link.attr('href', documenterBaseURL+'/'+result.ref)
-                cat = $('<span class="category">('+data.category+')</span>')
-                li = $('<li>').append(link).append(" ").append(cat)
-                $('#search-results').append(li)
-            })
-        }
+                $('#search-info').text("Number of results: " + results.length)
+                $('#search-results').empty()
+                results.forEach(function (result) {
+                    data = store[result.ref]
+                    link = $('<a>')
+                    link.text(data.title)
+                    link.attr('href', documenterBaseURL + '/' + result.ref)
+                    cat = $('<span class="category">(' + data.category + ')</span>')
+                    li = $('<li>').append(link).append(" ").append(cat)
+                    $('#search-results').append(li)
+                })
+            }
 
-        function update_search_box() {
-            querystring = $('#search-query').val()
-            update_search(querystring)
-        }
+            function update_search_box() {
+                querystring = $('#search-query').val()
+                update_search(querystring)
+            }
 
-        $('#search-query').keyup(_.debounce(update_search_box, 250))
-        $('#search-query').change(update_search_box)
+            $('#search-query').keyup(_.debounce(update_search_box, 250))
+            $('#search-query').change(update_search_box)
 
-        search_query_uri = parseUri(window.location).queryKey["q"]
-        if(search_query_uri !== undefined) {
-            search_query = decodeURIComponent(search_query_uri.replace(/\+/g, '%20'))
-            $("#search-query").val(search_query)
-        }
-        update_search_box();
-    })
+            search_query_uri = parseUri(window.location).queryKey["q"]
+            if (search_query_uri !== undefined) {
+                search_query = decodeURIComponent(search_query_uri.replace(/\+/g, '%20'))
+                $("#search-query").val(search_query)
+            }
+            update_search_box();
+        })
+    });
 })
